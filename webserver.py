@@ -43,13 +43,12 @@ class WebServerHandler(BaseHTTPRequestHandler):
 				message += '<h1>Add a New Restaurant</h2>'
 				message += '<form method="Post" enctype="multipart/form-data" action="/restaurant/new"><p>Restaurant Name</p>'
 				message += '<input name="new_restaurant" type="text"><input type="submit" value="Submit"></form>'
-				message += '</html></body>'
+				message += '</body></html>'
 				self.wfile.write(message)
 				return
 			if self.path.endswith('/edit'):
 				restaurant_id = self.path.split('/')[2]
 				restaurant = s.query(Restaurant).filter_by(id = restaurant_id).one()
-				print restaurant.name
 				if restaurant != []:
 					self.send_response(200)
 					self.send_header("Content-type", "text/html")
@@ -58,21 +57,26 @@ class WebServerHandler(BaseHTTPRequestHandler):
 					message += '<h1>Edit %s</h1>' %restaurant.name
 					message += '<form method="Post" enctype="multipart/form-data" action="%s/edit"><p>Restaurant Name</p>'  %restaurant_id
 					message += '<input name="new_name" type="text"><input type="submit" value="Rename"></form>'
-					message += '</html></body>'
+					message += '</body></html>'
 					self.wfile.write(message)
 					return
-			# if self.path.endswith('/restaurant/delete'):
-			# 	self.send_response(200)
-			# 	self.send_header("Content-type", "text/html")
-			# 	self.end_headers()
+			if self.path.endswith('/delete'):
+				restaurant_id = self.path.split('/')[2]
+				restaurant = s.query(Restaurant).filter_by(id = restaurant_id).one()
+				if restaurant != []:				
+					self.send_response(200)
+					self.send_header("Content-type", "text/html")
+					self.end_headers()
+					message = "<html><body>"
+					message += "<h1>Are you sure you want to delete %s?</h1>" %restaurant.name
+					message += "<form method='POST' enctype='multipart/form-data' action='%s/delete'><input name='yes' type='submit' value='Yes'>" %restaurant_id
+					message += '</br><a href="/restaurant">Back to List</a>'
+					message += "</body></html>"
+					self.wfile.write(message)
+					return
 	# exception if try fails
 		except IOError:
 			self.send_error(404, "File Not Found %s" % self.path)
-			if self.path.endswith('/restaurant/delete'):
-				self.send_response(200)
-				self.send_header("Content-type", "text/html")
-				self.end_headers()
-
 
 	def do_POST(self):
 		try:
@@ -110,12 +114,24 @@ class WebServerHandler(BaseHTTPRequestHandler):
 					self.send_header('Content-type', 'text/html')
 					self.send_header('Location', '/restaurant')
 					self.end_headers()
-			if self.path.endswith('/edit'):
+			if self.path.endswith('/delete'):
 				restaurant_id = self.path.split('/')[2]
 				restaurant = s.query(Restaurant).filter_by(id = restaurant_id).one()
-				if restaurant []:
+				ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
+				if ctype == "multipart/form":
+					fields = cgi.parse_multipart(self.rfile, pdict)
+					messagecontent = fields.get('yes')
+				if restaurant != []:
 					s.delete(restaurant)
 					s.commit()
+					self.send_response(201)
+					self.send_header('Content-type', 'text/html')
+					self.end_headers()
+					message = "<html><body>"
+					message += "<h1>%s has been deleted</h1>" %restaurant.name
+					message += '</br><a href="/restaurant">Back to List</a>'
+					message += "</body></html>"
+					self.wfile.write(message)
 		except:
 			print ("Failed to post for some reason or another.")
 
